@@ -792,6 +792,38 @@ class Backend:
             _filename_rule(document, _menu(document, (target_key,)), app_id, True)
         self._perform(f"Перенос в «{category.name}»", {self.menu_path: self._menu_bytes(document)})
 
+    def set_app_category(self, app_id: str, category_key: str, enabled: bool):
+        """Toggle one application/category relationship without moving other tags.
+
+        A checked entry adds exactly this association. Unchecking it creates
+        exclusions in the category and all its nested CMenu directories;
+        any other categories, launcher bytes, and favorite state are untouched.
+        Every change uses the existing guarded, persistent Undo/Redo journal.
+        """
+        self._require_apps([app_id])
+        category = self._require_category(category_key)
+        if not isinstance(enabled, bool):
+            raise BackendError("Неверное значение галочки раздела.")
+        if enabled and category.hidden:
+            raise BackendError("Скрытый раздел нужно сначала вернуть в меню.")
+
+        app = self._apps_by_id[app_id]
+        is_member = category_key in app.categories
+        if is_member == enabled:
+            return
+
+        document = self._document()
+        if enabled:
+            _filename_rule(document, _menu(document, (category_key,)), app_id, True)
+        else:
+            paths = {(category_key,)} | self._subpaths.get(category_key, set())
+            for path in sorted(paths):
+                _filename_rule(document, _menu(document, path), app_id, False)
+
+        action = "Добавление в раздел" if enabled else "Исключение из раздела"
+        self._perform(f"{action} «{category.name}»: «{app.name}»",
+                      {self.menu_path: self._menu_bytes(document)})
+
     def add_category(self, name: str, icon: str = "folder") -> str:
         name = _label(name, "название раздела")
         key = "mint-menu-studio-" + uuid.uuid4().hex

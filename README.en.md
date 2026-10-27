@@ -10,6 +10,7 @@ A local GTK 3 menu editor for **Linux Mint Cinnamon**. Organize launchers and ca
 
 - Move applications between menu categories; drag one or several selected applications (Ctrl / Shift).
 - Rearrange categories in the left pane and entries within a category in the right pane.
+- **Category checkboxes:** right-click an app → **Разделы приложения** (Application categories) → tick or untick any existing category. One app can appear in several categories simultaneously; each click saves immediately.
 - Define a different ordering for each category, plus a separate All Applications order.
 - Create custom categories and .desktop launchers; edit name, icon, description, command and terminal setting.
 - Hide entries without uninstalling the software; restore them later.
@@ -64,10 +65,11 @@ Without the adapter, Cinnamon returns to its built-in sorting. A plain editor up
 1. Drag categories up or down in the left panel.
 2. In a category, drag applications above or below other entries to reorder them, or drop them onto a category to move them there.
 3. Use Ctrl / Shift to select and move multiple launchers.
-4. Create a **Category** or **Application** with the toolbar. Double-click an entry to edit it.
-5. The **Hide** action hides the menu entry, not the underlying program. Restore it from **Hidden Applications**.
-6. Drag entries into **Favorites**, then reorder them by dragging or using arrow buttons.
-7. Undo with **Ctrl+Z**, redo with **Ctrl+Shift+Z** or **Ctrl+Y**.
+4. **Right-click an app → Application categories** (Разделы приложения) for a submenu of category checkboxes. Each click updates membership immediately; reopen the submenu for additional changes. Unticking the last category may remove the entry from the menu, but never uninstalls the app.
+5. Create a **Category** or **Application** with the toolbar. Double-click an entry to edit it.
+6. The **Hide** action hides the menu entry, not the underlying program. Restore it from **Hidden Applications**.
+7. Drag entries into **Favorites**, then reorder them by dragging or using arrow buttons.
+8. Undo with **Ctrl+Z**, redo with **Ctrl+Shift+Z** or **Ctrl+Y**.
 
 Special All Applications / Favorites / Hidden Applications rows in the editor remain fixed. Search results are not manually sortable. Empty custom categories appear in the editor immediately and in Cinnamon after at least one application is assigned.
 
@@ -96,4 +98,4 @@ The editor and its own managed optional adapter are removed. Personal menu custo
 
 The editor and adapter generator are licensed under **MIT**. Original Cinnamon sources are **not shipped** in this repository. Locally generated modified Cinnamon applet files retain the relevant upstream Cinnamon license obligations.
 
-Version **1.1.1**.
+Version **1.2.0**.

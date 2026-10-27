@@ -9,7 +9,7 @@ import traceback
 from pathlib import Path
 
 if "--version" in sys.argv:
-    print("Mint Menu Studio 1.1.1")
+    print("Mint Menu Studio 1.2.0")
     raise SystemExit(0)
 
 import gi
@@ -19,7 +19,7 @@ from gi.repository import Gtk, Gdk, Gio, GLib, Pango
 
 from menu_backend import Backend, BackendError, ConflictError
 
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 APP_ID = "ru.amosh.MenuStudio"
 DRAG_TYPE = "application/x-mint-menu-studio-apps"
 CATEGORY_DRAG_TYPE = "application/x-mint-menu-studio-category"
@@ -852,6 +852,56 @@ class EditorWindow(Gtk.ApplicationWindow):
         Gtk.drag_finish(context, success, False, time)
         widget.set_drag_dest_row(None, Gtk.TreeViewDropPosition.INTO_OR_AFTER)
 
+    def app_categories_submenu(self, app_id):
+        """A native GTK submenu with a checked entry for every Cinnamon folder."""
+        app = self.app_map().get(app_id)
+        if app is None:
+            raise BackendError("Ярлык больше не найден. Нажмите «Обновить».")
+
+        submenu = Gtk.Menu()
+        for category in self.backend.ordered_categories():
+            assigned = category.key in app.categories
+            title = category.name + (" (скрыт)" if category.hidden else "")
+            checkbox = Gtk.CheckMenuItem.new_with_label(title)
+            checkbox.set_active(assigned)
+            # Remove a legacy assignment from a hidden folder if desired,
+            # but never add an app to a folder that Cinnamon will not show.
+            checkbox.set_sensitive(not category.hidden or assigned)
+            checkbox.connect("toggled", self.on_app_category_toggled, app_id, category.key)
+            submenu.append(checkbox)
+
+        if not self.backend.categories:
+            empty = Gtk.MenuItem.new_with_label("Разделов пока нет")
+            empty.set_sensitive(False)
+            submenu.append(empty)
+        return submenu
+
+    def on_app_category_toggled(self, item, app_id, category_key):
+        """Apply one tick immediately; restore the checkbox on any conflict."""
+        if getattr(self, "_restoring_category_tick", False):
+            return
+        enabled = item.get_active()
+        try:
+            previous = self.app_map().get(app_id)
+            old_categories = set(previous.categories) if previous else set()
+            self.backend.set_app_category(app_id, category_key, enabled)
+        except (BackendError, GLib.Error, OSError, ValueError, TypeError) as exc:
+            self._restoring_category_tick = True
+            try:
+                item.set_active(not enabled)
+            finally:
+                self._restoring_category_tick = False
+            self.error_dialog(str(exc))
+            return
+
+        # Keep the correct submenu state, refresh the membership column and
+        # enable undo. A removed row can disappear from the current category.
+        self.refresh_view([app_id])
+        if not enabled and len(old_categories) == 1 and category_key in old_categories:
+            self.show_status("Последний раздел снят. Ярлык может исчезнуть из меню. Отмена: Ctrl+Z.")
+        else:
+            self.show_status("Раздел добавлен." if enabled else "Раздел снят. Отмена: Ctrl+Z.")
+
     def app_popup(self, widget, event):
         if event.button == 1:
             position = widget.get_path_at_pos(int(event.x), int(event.y))
@@ -868,9 +918,24 @@ class EditorWindow(Gtk.ApplicationWindow):
         if not self.selected_ids():
             return False
         menu = Gtk.Menu()
-        for label, action in [("Изменить…", self.edit_app), ("Переместить…", self.move_dialog),
-                              (self.favorite_button.get_label(), self.toggle_favorites),
-                              (self.hide_button.get_label() + " из меню" if self.hide_button.get_label() == "Убрать" else "Вернуть в меню", self.hide_apps)]:
+        for label, action in [("Изменить…", self.edit_app), ("Переместить…", self.move_dialog)]:
+            item = Gtk.MenuItem.new_with_label(label)
+            item.connect("activate", action)
+            menu.append(item)
+
+        # The clicked launcher is explicit even when a group remains selected.
+        # Other context actions retain the existing group-selection behavior.
+        if position:
+            app_id = self.app_store[position[0]][3]
+            membership = Gtk.MenuItem.new_with_label("Разделы приложения")
+            membership.set_submenu(self.app_categories_submenu(app_id))
+            menu.append(membership)
+
+        for label, action in [
+            (self.favorite_button.get_label(), self.toggle_favorites),
+            (self.hide_button.get_label() + " из меню" if self.hide_button.get_label() == "Убрать"
+             else "Вернуть в меню", self.hide_apps)
+        ]:
             item = Gtk.MenuItem.new_with_label(label)
             item.connect("activate", action)
             menu.append(item)
@@ -936,6 +1001,7 @@ class EditorWindow(Gtk.ApplicationWindow):
             "• Перетащите приложение в раздел слева. Можно выделить несколько с Ctrl или Shift.\n\n"
             "• Кнопка «Переместить» делает то же без перетаскивания. Из «Всех приложений» перенос заменяет все текущие разделы; из конкретного — только его.\n\n"
             "• «Раздел» и «Приложение» вверху создают новые пункты. Двойной щелчок открывает название, команду и значок.\n\n"
+            "• Щёлкните по приложению правой кнопкой и откройте «Разделы приложения» — поставьте или снимите галочки для каждого раздела. Одно приложение может находиться в нескольких разделах.\n\n"
             "• «Убрать» скрывает ярлык, сохраняя установленную программу. В «Скрытых приложениях» есть кнопка «Вернуть». Скрытые разделы остаются слева и тоже восстанавливаются.\n\n"
             "• Перетащите ярлык в «Избранное» для значков в левой части меню. Стрелки ↑ и ↓ меняют их порядок.\n\n"
             "• Изменения сохраняются сразу. Ctrl+Z — отменить; Ctrl+Shift+Z — повторить. История сохраняется после закрытия редактора.\n\n"
